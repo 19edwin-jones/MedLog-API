@@ -1,3 +1,6 @@
+// HTTP layer for med logs: reads req.userId (set by the JWT middleware) and
+// req.body, delegates to the service, and maps the service's thrown error codes
+// (VALIDATION_ERROR, NOT_FOUND, ...) onto HTTP status codes.
 const {
   createMedLog: createMedLogService,
   getMedLogs: getMedLogsService,
@@ -8,7 +11,7 @@ const {
 
 async function createMedLog(req, res) {
   try {
-    const medLog = await createMedLogService(req.body);
+    const medLog = await createMedLogService(req.userId, req.body);
     res.status(201).json(medLog);
   } catch (error) {
     if (error.message === "VALIDATION_ERROR") {
@@ -28,7 +31,7 @@ async function createMedLog(req, res) {
 
 async function getMedLogs(req, res) {
   try {
-    const medLogs = await getMedLogsService();
+    const medLogs = await getMedLogsService(req.userId);
     res.json(medLogs);
   } catch (error) {
     console.error("getMedLogs error:", error.message);
@@ -41,7 +44,7 @@ async function getMedLogs(req, res) {
 async function getMedLogById(req, res) {
   try {
     const { id } = req.params;
-    const medLog = await getMedLogByIdService(id);
+    const medLog = await getMedLogByIdService(req.userId, id);
     res.json(medLog);
   } catch (error) {
     if (error.message === "NOT_FOUND") {
@@ -58,7 +61,7 @@ async function getMedLogById(req, res) {
 async function updateMedLog(req, res) {
   try {
     const { id } = req.params;
-    const updatedLog = await updateMedLogService(id, req.body);
+    const updatedLog = await updateMedLogService(req.userId, id, req.body);
     res.json(updatedLog);
   } catch (error) {
     if (error.message === "VALIDATION_ERROR") {
@@ -79,7 +82,7 @@ async function updateMedLog(req, res) {
 async function deleteMedLog(req, res) {
   try {
     const { id } = req.params;
-    await deleteMedLogService(id);
+    await deleteMedLogService(req.userId, id);
     res.json({ message: "Medication log deleted" });
   } catch (error) {
     if (error.message === "NOT_FOUND") {

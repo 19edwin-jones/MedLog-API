@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const apiKeyAuth = require("../middleware/auth");
+const jwtAuth = require("../middleware/auth");
 const {
   createMedLog,
   getMedLogs,
@@ -10,7 +10,8 @@ const {
   deleteMedLog,
 } = require("../controllers/medLogController");
 
-router.use(apiKeyAuth);
+// Every route below requires a valid JWT; req.userId is set for the handlers.
+router.use(jwtAuth);
 
 router.get("/", getMedLogs);
 router.post("/", createMedLog);

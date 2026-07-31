@@ -1,5 +1,7 @@
 const MedLog = require("../models/MedLog");
 
+// Returns the start/end timestamps of the calendar day containing `date`,
+// used to count how many doses fall on that day. Uses the server's local time zone.
 function getDoseWindow(date) {
   const start = new Date(date);
   start.setHours(0, 0, 0, 0);
@@ -10,7 +12,7 @@ function getDoseWindow(date) {
   return { startOfDay: start, endOfDay: end };
 }
 
-async function createMedLog(data) {
+async function createMedLog(userId, data) {
   const { medication, doseMg, takenAt, notes } = data;
 
   if (!medication || doseMg == null || !takenAt) {
@@ -32,9 +34,11 @@ async function createMedLog(data) {
     throw error;
   }
 
+  // Cap doses at 2 per calendar day, counting only this user's logs.
   const { startOfDay, endOfDay } = getDoseWindow(takenDate);
 
   const count = await MedLog.countDocuments({
+    userId,
     takenAt: { $gte: startOfDay, $lte: endOfDay },
   });
 
@@ -43,6 +47,7 @@ async function createMedLog(data) {
   }
 
   return MedLog.create({
+    userId,
     medication,
     doseMg,
     takenAt: takenDate,
@@ -50,12 +55,14 @@ async function createMedLog(data) {
   });
 }
 
-async function getMedLogs() {
-  return MedLog.find().sort({ takenAt: -1 });
+async function getMedLogs(userId) {
+  return MedLog.find({ userId }).sort({ takenAt: -1 });
 }
 
-async function getMedLogById(id) {
-  const medLog = await MedLog.findById(id);
+async function getMedLogById(userId, id) {
+  // Matching on both _id and userId means one user can never read another's log —
+  // a mismatched owner simply looks like "not found".
+  const medLog = await MedLog.findOne({ _id: id, userId });
 
   if (!medLog) {
     throw new Error("NOT_FOUND");
@@ -64,8 +71,8 @@ async function getMedLogById(id) {
   return medLog;
 }
 
-async function updateMedLog(id, data) {
-  const medLog = await MedLog.findById(id);
+async function updateMedLog(userId, id, data) {
+  const medLog = await MedLog.findOne({ _id: id, userId });
   if (!medLog) {
     throw new Error("NOT_FOUND");
   }
@@ -87,9 +94,11 @@ async function updateMedLog(id, data) {
       throw error;
     }
 
+    // Re-check the daily cap for the new date, ignoring this record itself.
     const { startOfDay, endOfDay } = getDoseWindow(takenDate);
 
     const count = await MedLog.countDocuments({
+      userId,
       _id: { $ne: id }, // exclude current record
       takenAt: { $gte: startOfDay, $lte: endOfDay },
     });
@@ -105,12 +114,13 @@ async function updateMedLog(id, data) {
   return medLog.save();
 }
 
-async function deleteMedLog(id) {
-  const medLog = await MedLog.findById(id);
-  if (!medLog) {
+async function deleteMedLog(userId, id) {
+  // Scoped by userId so a user can only delete their own log; deletedCount of 0
+  // means no such log existed for this user.
+  const result = await MedLog.deleteOne({ _id: id, userId });
+  if (result.deletedCount === 0) {
     throw new Error("NOT_FOUND");
   }
-  await MedLog.deleteOne();
 }
 
 module.exports = {

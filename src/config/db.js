@@ -11,6 +11,7 @@ async function connectDB() {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("MongoDB connected");
   } catch (error) {
+    // Without a database the API can do nothing useful, so fail fast on startup.
     console.error("MongoDB connection failed:", error.message);
     process.exit(1);
   }
