@@ -3,3 +3,9 @@ npm-debug.log
 .git
 .gitignore
 .env
+*.tar
+.idea
+.DS_Store
+.claude
+Dockerfile
+.dockerignore
