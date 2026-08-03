@@ -13,6 +13,19 @@ function signToken(user) {
   });
 }
 
+function validatePassword(password) {
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+  return {
+    isValid: hasUppercase && hasNumber && hasSpecial,
+    missingUppercase: !hasUppercase,
+    missingNumber: !hasNumber,
+    missingSpecial: !hasSpecial
+  };
+}
+
 async function register(data) {
   const { email, password } = data;
 
@@ -24,6 +37,13 @@ async function register(data) {
   if (password.length < 8) {
     const error = new Error("VALIDATION_ERROR");
     error.details = "password must be at least 8 characters";
+    throw error;
+  }
+  // Validate password complexity
+  const passwordValidation = validatePassword(password);
+  if (!passwordValidation.isValid) {
+    const error = new Error("VALIDATION_ERROR");
+    error.details = "password must contain at least one uppercase letter, one number, and one special character";
     throw error;
   }
 
