@@ -72,6 +72,12 @@ async function updateMedLog(req, res) {
       return res.status(404).json({ error: "Medication log not found" });
     }
 
+    if (error.message === "MAX_DAILY_DOSES_EXCEEDED") {
+      return res.status(400).json({
+        error: "Maximum of 2 doses per day exceeded",
+      });
+    }
+
     console.error("updateMedLog error:", error.message);
     res.status(500).json({
       error: "Failed to update medication log",

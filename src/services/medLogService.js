@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const MedLog = require("../models/MedLog");
 
 // Returns the start/end timestamps of the calendar day containing `date`,
@@ -12,19 +13,42 @@ function getDoseWindow(date) {
   return { startOfDay: start, endOfDay: end };
 }
 
-async function createMedLog(userId, data) {
+// A malformed id can't match any document, so treat it as "not found" instead of
+// letting Mongoose throw a CastError (which would surface as a 500).
+function assertValidId(id) {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new Error("NOT_FOUND");
+  }
+}
+
+function validationError(details) {
+  const error = new Error("VALIDATION_ERROR");
+  error.details = details;
+  return error;
+}
+
+// Checks the types of any fields present; missing fields are allowed so this
+// works for both create and partial updates.
+function validateFieldTypes({ medication, doseMg, notes }) {
+  if (medication !== undefined && (typeof medication !== "string" || !medication.trim())) {
+    throw validationError("medication must be a non-empty string");
+  }
+  if (doseMg !== undefined && (typeof doseMg !== "number" || !(doseMg > 0))) {
+    throw validationError("doseMg must be a number greater than 0");
+  }
+  if (notes !== undefined && typeof notes !== "string") {
+    throw validationError("notes must be a string");
+  }
+}
+
+// Express 5 leaves req.body undefined when no JSON body is sent, hence the default.
+async function createMedLog(userId, data = {}) {
   const { medication, doseMg, takenAt, notes } = data;
 
   if (!medication || doseMg == null || !takenAt) {
-    const error = new Error("VALIDATION_ERROR");
-    error.details = "medication, doseMg, and takenAt are required";
-    throw error;
+    throw validationError("medication, doseMg, and takenAt are required");
   }
-  if (doseMg <= 0) {
-    const error = new Error("VALIDATION_ERROR");
-    error.details = "doseMg must be greater than 0";
-    throw error;
-  }
+  validateFieldTypes({ medication, doseMg, notes });
 
   const takenDate = new Date(takenAt);
 
@@ -60,6 +84,7 @@ async function getMedLogs(userId) {
 }
 
 async function getMedLogById(userId, id) {
+  assertValidId(id);
   // Matching on both _id and userId means one user can never read another's log —
   // a mismatched owner simply looks like "not found".
   const medLog = await MedLog.findOne({ _id: id, userId });
@@ -71,19 +96,15 @@ async function getMedLogById(userId, id) {
   return medLog;
 }
 
-async function updateMedLog(userId, id, data) {
+async function updateMedLog(userId, id, data = {}) {
+  assertValidId(id);
   const medLog = await MedLog.findOne({ _id: id, userId });
   if (!medLog) {
     throw new Error("NOT_FOUND");
   }
 
   const { medication, doseMg, takenAt, notes } = data;
-
-  if (doseMg !== undefined && doseMg <= 0) {
-    const error = new Error("VALIDATION_ERROR");
-    error.details = "doseMg must be greater than 0";
-    throw error;
-  }
+  validateFieldTypes({ medication, doseMg, notes });
   if (medication !== undefined) medLog.medication = medication;
   if (doseMg !== undefined) medLog.doseMg = doseMg;
   if (takenAt !== undefined) {
@@ -115,6 +136,7 @@ async function updateMedLog(userId, id, data) {
 }
 
 async function deleteMedLog(userId, id) {
+  assertValidId(id);
   // Scoped by userId so a user can only delete their own log; deletedCount of 0
   // means no such log existed for this user.
   const result = await MedLog.deleteOne({ _id: id, userId });

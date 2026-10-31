@@ -26,10 +26,11 @@ function validatePassword(password) {
   };
 }
 
-async function register(data) {
+// Express 5 leaves req.body undefined when no JSON body is sent, hence the default.
+async function register(data = {}) {
   const { email, password } = data;
 
-  if (!email || !password) {
+  if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
     const error = new Error("VALIDATION_ERROR");
     error.details = "email and password are required";
     throw error;
@@ -55,15 +56,25 @@ async function register(data) {
 
   // Never store the raw password — only its bcrypt hash.
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  const user = await User.create({ email, passwordHash });
+  let user;
+  try {
+    user = await User.create({ email, passwordHash });
+  } catch (error) {
+    // Two concurrent registrations can both pass the check above; the unique
+    // index on email rejects the second one.
+    if (error.code === 11000) {
+      throw new Error("EMAIL_TAKEN");
+    }
+    throw error;
+  }
 
   return { user: { id: user._id, email: user.email }, token: signToken(user) };
 }
 
-async function login(data) {
+async function login(data = {}) {
   const { email, password } = data;
 
-  if (!email || !password) {
+  if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
     const error = new Error("VALIDATION_ERROR");
     error.details = "email and password are required";
     throw error;
