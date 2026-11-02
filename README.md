@@ -19,7 +19,10 @@ Requirements: Node.js 22+ and a MongoDB database (local or Atlas).
 npm install
 npm run dev     # auto-reloads on changes (nodemon)
 npm start       # production
+npm test        # run the test suite
 ```
+
+Tests run against an in-memory MongoDB, so they don't need a database or a `.env` file. The first run downloads a MongoDB binary.
 
 Create a `.env` file in the project root:
 
@@ -39,7 +42,7 @@ docker build -t medlog-api .
 docker run -p 3000:3000 --env-file .env medlog-api
 ```
 
-Every push to `main` builds the image and pushes it to Docker Hub as `medlog-api:latest` and `medlog-api:<commit-sha>`, via GitHub Actions.
+Every push to `main` runs the tests and, if they pass, builds the image and pushes it to Docker Hub as `medlog-api:latest` and `medlog-api:<commit-sha>`, via GitHub Actions.
 
 ## API
 
@@ -166,5 +169,5 @@ src/
 - [ ] Limit request body size.
 - [ ] Configure CORS.
 - [ ] Avoid logging passwords or tokens.
-- [ ] Write authentication and authorization tests.
+- [x] Write authentication and authorization tests.
 - [ ] Rotate signing secrets when necessary.
