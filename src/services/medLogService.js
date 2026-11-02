@@ -33,7 +33,14 @@ function validateFieldTypes({ medication, doseMg, notes }) {
   if (medication !== undefined && (typeof medication !== "string" || !medication.trim())) {
     throw validationError("medication must be a non-empty string");
   }
-  if (doseMg !== undefined && (typeof doseMg !== "number" || !(doseMg > 0))) {
+  // Numeric strings like "10" are accepted (Apple Shortcuts sends numbers as
+  // strings); callers store Number(doseMg).
+  if (
+    doseMg !== undefined &&
+    ((typeof doseMg !== "number" && typeof doseMg !== "string") ||
+      !Number.isFinite(Number(doseMg)) ||
+      !(Number(doseMg) > 0))
+  ) {
     throw validationError("doseMg must be a number greater than 0");
   }
   if (notes !== undefined && typeof notes !== "string") {
@@ -73,7 +80,7 @@ async function createMedLog(userId, data = {}) {
   return MedLog.create({
     userId,
     medication,
-    doseMg,
+    doseMg: Number(doseMg),
     takenAt: takenDate,
     notes,
   });
@@ -106,7 +113,7 @@ async function updateMedLog(userId, id, data = {}) {
   const { medication, doseMg, takenAt, notes } = data;
   validateFieldTypes({ medication, doseMg, notes });
   if (medication !== undefined) medLog.medication = medication;
-  if (doseMg !== undefined) medLog.doseMg = doseMg;
+  if (doseMg !== undefined) medLog.doseMg = Number(doseMg);
   if (takenAt !== undefined) {
     const takenDate = new Date(takenAt);
     if (Number.isNaN(takenDate.getTime())) {
